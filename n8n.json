@@ -1,0 +1,762 @@
+{
+  "name": "LinkedIn Job Alert Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "linkedin-job-alert",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "588e397d-2059-4b32-9efc-b89138697d07",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -1744,
+        432
+      ],
+      "webhookId": "2a74200b-7389-4031-9ea1-16ef4224ef9e"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst jobTitle = (body.jobTitle || '').trim();\nconst location = (body.location || 'Remote').trim();\nlet limit = parseInt(body.limit, 10);\nif (!Number.isFinite(limit) || limit <= 0) limit = 20;\nif (limit > 100) limit = 100; // hard cap to protect Apify usage/cost\nif (!jobTitle) {\n  throw new Error('jobTitle is required, e.g. \"Python Developer\"');\n}\nreturn [{\n  json: {\n    jobTitle, location, limit,\n    pollAttempts: 0,\n    maxPollAttempts: 20,\n    pollIntervalSeconds: 15,\n    requestId: $execution.id\n  }\n}];\n"
+      },
+      "id": "b47ca7d8-70a5-46b7-9131-3b2802b49e8a",
+      "name": "Validate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        -1520,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "=https://api.apify.com/v2/actor-runs/0rc3W57f9nzuPdtru/resurrect?token=apify_api_nOWjf5vi5DnhOF9AXKLYrk7fehFQeZ1fG3FC",
+        "options": {},
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "urls",
+              "value": "[]"
+            }
+          ]
+        }
+      },
+      "id": "fa128db1-b2eb-467e-a841-794fcc4b72ed",
+      "name": "Start Run",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        -1296,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{\n  json: {\n    ...$json,\n    pollAttempts: 0,\n    maxPollAttempts: 20\n  }\n}];"
+      },
+      "id": "0f1264be-b0dc-402c-a700-4c7f28dbb34d",
+      "name": "Init Poll State",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1072,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "amount": "={{ $json.pollIntervalSeconds || 15 }}"
+      },
+      "id": "55e243eb-5c4e-4244-b398-d079e04dc59f",
+      "name": "Wait",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -848,
+        432
+      ],
+      "webhookId": "6ccb4ccc-6468-4410-abe3-9b4615093b8c"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.apify.com/v2/actor-runs/{{$json.runId || $node[\"Start Run\"].json.data.id}}",
+        "options": {},
+        "queryParametersUi": {
+          "parameter": [
+            {
+              "name": "token",
+              "value": "apify_api_nOWjf5vi5DnhOF9AXKLYrk7fehFQeZ1fG3FC"
+            }
+          ]
+        }
+      },
+      "id": "3960fb22-83d6-4f49-879a-3b03f464fdcc",
+      "name": "Check Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        -640,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const prevPoll = $('Wait').item.json.pollAttempts ?? 0;\nconst maxPoll = $('Wait').item.json.maxPollAttempts ?? 20;\nreturn [{\n  json: {\n    ...$json,\n    pollAttempts: prevPoll + 1,\n    maxPollAttempts: maxPoll\n  }\n}];"
+      },
+      "id": "847b4a5c-e7d4-4d0c-a3fc-c8d4b3ec350a",
+      "name": "Code in JavaScript",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -416,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "ad506a8d-8cb1-4f9f-a781-792e7bf6cfae",
+              "leftValue": "={{ $json.data.status }}",
+              "rightValue": "SUCCEEDED",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "48603652-d1ab-4421-95ef-e0f836cb27fc",
+      "name": "Check Succeeded",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.apify.com/v2/actor-runs/{{$json.data.id}}/dataset/items",
+        "options": {},
+        "queryParametersUi": {
+          "parameter": [
+            {
+              "name": "token",
+              "value": "apify_api_nOWjf5vi5DnhOF9AXKLYrk7fehFQeZ1fG3FC"
+            }
+          ]
+        }
+      },
+      "id": "4b218600-6603-48d9-a05a-c74735f1fdbd",
+      "name": "Get Dataset",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        32,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputItems = $input.all();\nlet items = [];\nif (inputItems.length === 1 && Array.isArray(inputItems[0].json)) { items = inputItems[0].json; } else { items = inputItems.map(i => i.json); }\nconst rows = (Array.isArray(items) ? items : []).map(job => ({\n  jobTitle: job.title || job.jobTitle || '',\n  companyName: job.companyName || job.company || '',\n  location: job.location || job.jobLocation || '',\n  postedTime: job.postedTime || job.datePosted || '',\n  jobUrl: job.jobUrl || job.link || job.url || '',\n  companyUrl: job.companyUrl || job.companyLink || ''\n})).filter(r => r.jobUrl);\nreturn rows.map(r => ({ json: r }));\n"
+      },
+      "id": "406dac43-5422-4899-b454-b2401e2cc347",
+      "name": "Transform",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        256,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "sheetId": "16tWRSzqQc35CS_6H8fJjnyB-dP9U1Hx2PdoLV9gbYSM",
+        "range": "=Jobs!A:F",
+        "options": {}
+      },
+      "id": "1bb3f8f6-c8bf-403f-b42c-cf050a8667da",
+      "name": "Get Existing",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 1,
+      "position": [
+        480,
+        240
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "qYJNchRYZfwLyOmN",
+          "name": "Google Sheets account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const existing = new Set($items('Get Existing').map(i => i.json.jobUrl));\nconst incoming = $items('Transform');\nconst fresh = incoming.filter(i => !existing.has(i.json.jobUrl));\nreturn fresh.length ? fresh : [{ json: { _noNewJobs: true } }];\n"
+      },
+      "id": "5152323d-4136-4a80-bafd-36ed80c617d4",
+      "name": "Filter New",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        688,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "append",
+        "sheetId": "16tWRSzqQc35CS_6H8fJjnyB-dP9U1Hx2PdoLV9gbYSM",
+        "range": "Jobs!A:F",
+        "options": {}
+      },
+      "id": "77980010-3b0a-47ca-8a1d-f4b5aa801aea",
+      "name": "Append Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 1,
+      "position": [
+        912,
+        240
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "qYJNchRYZfwLyOmN",
+          "name": "Google Sheets account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=AQ.Ab8RN6I6OjS7dB6nZ9o_6vOfcCuCnwDFzFsrAx1qnySeHSfFeg",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={{ JSON.stringify({ contents: [{ parts: [{ text: 'Here is a list of newly scraped LinkedIn job postings as JSON: ' + JSON.stringify($items('Transform').map(i => i.json)) + '. Write a 2-3 sentence summary covering: the most common hiring companies, the most common locations, and any noticeable hiring trends.' }] }] }) }}"
+      },
+      "id": "5d15c24b-6077-4a5c-a80a-75e93d6cc48a",
+      "name": "Ai Summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "append",
+        "sheetId": "16tWRSzqQc35CS_6H8fJjnyB-dP9U1Hx2PdoLV9gbYSM",
+        "range": "Summaries!A:E",
+        "options": {}
+      },
+      "id": "d6958951-591f-4d27-a54c-a2479fe2cedd",
+      "name": "Log Summary",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 1,
+      "position": [
+        1568,
+        240
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "qYJNchRYZfwLyOmN",
+          "name": "Google Sheets account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({\n  status: 'success',\n  jobsFound: $('Transform').all().length,\n  jobsAdded: $('Filter New').all().filter(i => !i.json._noNewJobs).length,\n  summary: $('Log Summary').item.json.summary || null\n}) }}",
+        "options": {}
+      },
+      "id": "0cb9fcdd-e05d-4c5c-a311-6e5a09eaa1b5",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1792,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "channel": "C0C05HBPHD0",
+        "text": "={{ '📋 *' + $('Validate').first().json.jobTitle + '* in *' + $('Validate').first().json.location + '*: ' + $('Filter New').all().filter(i => !i.json._noNewJobs).length + ' new job(s) added.\\n' + ($json.content ? $json.content[0].text : '') }}",
+        "otherOptions": {},
+        "attachments": []
+      },
+      "id": "e1d12ee7-09a0-4dc0-b6b1-b43181ad447e",
+      "name": "Notify New Jobs",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1,
+      "position": [
+        2016,
+        240
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "PZnR3VCBsddMWRZs",
+          "name": "Unnamed credential"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond2",
+              "leftValue": "={{ ['READY','RUNNING'].includes($json.data.status) && $json.pollAttempts < $json.maxPollAttempts }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "01eadbed-743b-42d8-af00-ee423e2d19f8",
+              "leftValue": "={{ $json.data.status }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7136bfa3-ab72-4f40-9763-c74214c1a84e",
+      "name": "Check Still Running",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        80,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const run = $json.data || {};\nreturn [{ json: {\n  status: 'error',\n  reason: run.status ? `Apify run ended with status: ${run.status}` : 'Polling timed out waiting for the Apify run to finish',\n  runId: run.id || null\n} }];\n"
+      },
+      "id": "ad953c77-da85-477b-a539-9117c73a2e2f",
+      "name": "Format Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        400,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "50a85e0c-7a7a-47bd-8693-5e3506283756",
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        608,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "channel": "C0C05HBPHD0",
+        "text": "={{ '⚠️ LinkedIn job scrape failed for *' + $('Validate').first().json.jobTitle + '*: ' + $json.reason }}",
+        "otherOptions": {},
+        "attachments": []
+      },
+      "id": "e3e7bcae-03d0-4e6a-9a6d-1a37f7fe5916",
+      "name": "Notify Failure",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1,
+      "position": [
+        816,
+        464
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "PZnR3VCBsddMWRZs",
+          "name": "Unnamed credential"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "b27a5e03-069e-4d75-b3e5-2d7a2cef72c9",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1744,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1f0c3d2-1111-4a11-8a01-000000000001",
+              "name": "jobTitle",
+              "type": "string",
+              "value": "AI Automation"
+            },
+            {
+              "id": "a1f0c3d2-1111-4a11-8a01-000000000002",
+              "name": "location",
+              "type": "string",
+              "value": "Bangladesh"
+            },
+            {
+              "id": "a1f0c3d2-1111-4a11-8a01-000000000003",
+              "name": "limit",
+              "type": "number",
+              "value": 10
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "56e1f71d-7845-4228-9ffb-5f9a51002d29",
+      "name": "Set Default Search",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1520,
+        640
+      ],
+      "notes": "Edit these 3 values (or add more Set nodes in parallel) to change what the daily scheduled run searches for."
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{\n  json: {\n    timestamp: new Date().toISOString(),\n    jobTitle: $('Validate').first().json.jobTitle,\n    location: $('Validate').first().json.location,\n    jobsFound: $('Transform').all().length,\n    summary: $json.candidates[0].content.parts[0].text\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        240
+      ],
+      "id": "e56a9e5a-ac2a-43b9-b496-7163b2738e93",
+      "name": "Format Summary"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate": {
+      "main": [
+        [
+          {
+            "node": "Start Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start Run": {
+      "main": [
+        [
+          {
+            "node": "Init Poll State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Init Poll State": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Check Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Status": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Check Succeeded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Succeeded": {
+      "main": [
+        [
+          {
+            "node": "Get Dataset",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Still Running",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Dataset": {
+      "main": [
+        [
+          {
+            "node": "Transform",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform": {
+      "main": [
+        [
+          {
+            "node": "Get Existing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Existing": {
+      "main": [
+        [
+          {
+            "node": "Filter New",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter New": {
+      "main": [
+        [
+          {
+            "node": "Append Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append Sheet": {
+      "main": [
+        [
+          {
+            "node": "Ai Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ai Summary": {
+      "main": [
+        [
+          {
+            "node": "Format Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Summary": {
+      "main": [
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond Success": {
+      "main": [
+        [
+          {
+            "node": "Notify New Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Still Running": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Error": {
+      "main": [
+        [
+          {
+            "node": "Respond Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond Error": {
+      "main": [
+        [
+          {
+            "node": "Notify Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Default Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Default Search": {
+      "main": [
+        [
+          {
+            "node": "Validate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Summary": {
+      "main": [
+        [
+          {
+            "node": "Log Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "a7b5789c-24c6-44f6-9f50-685dcf665b8e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d84316a14930751f37d0bec503938ddf595960c104df07d39b597d97d03d6d2a"
+  },
+  "nodeGroups": [],
+  "id": "511cp489cSFFIXyR",
+  "tags": []
+}
